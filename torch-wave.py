@@ -79,7 +79,7 @@ optimize(n_optim_steps)
 
 # Velocity profile
 plt.plot(c.detach().numpy(), 'r--', label='velocity profile')
-plt.savefig("c.png")
+plt.plot(ctarget.detach().numpy(), 'c', label='Target velocity profile')
 
 # Waves
 wave = forward(c)
