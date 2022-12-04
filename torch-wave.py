@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import matplotlib.pyplot as plt
 
 # Set up an n-point uniform mesh
@@ -40,6 +41,12 @@ def forward(c):
 # Speed of sound, space step, time step
 # ctarget = torch.ones(n) * 0.9 # constant model
 ctarget = torch.linspace(0.9, 1.0, n) # linear model
+# Model field values
+v_init = [220.0, 199.0, 221.0, 228.0, 212.0, 237.0, 215.0, 239.0, 488.0, 539.0, 520.0, 522.0, 516.0, 600.0, 536.0, 466.0, 539.0, 541.0, 516.0, 522.0, 539.0, 577.0, 523.0, 528.0]
+x_init = torch.linspace(0,1,len(v_init))
+v0 = np.interp(x0, x_init, v_init)
+v0 = v0/np.max(v0) 
+# ctarget = torch.from_numpy(v0)
 
 target = forward(ctarget)
 
@@ -55,9 +62,9 @@ c = torch.linspace(0.85, 1.0, n) # Linear model
 c.requires_grad = True
 
 # LBGFS Optimizer
-# optim = torch.optim.LBFGS([c], history_size=10, max_iter=100, line_search_fn="strong_wolfe")
+optim = torch.optim.LBFGS([c], history_size=10, max_iter=1000, line_search_fn="strong_wolfe")
 # optim = torch.optim.SGD([c], lr=1e-4, momentum=1e-3)
-optim = torch.optim.Adam([c], lr=1e-4)
+# optim = torch.optim.Adam([c], lr=1e-4)
 
 # A closure that reevaluates the model and returns the loss.
 def closure():
@@ -74,7 +81,7 @@ def optimize(iter):
         print('Step: {} loss: {}, wave velocity min {} max {} avg {}'.format(i, loss.item(), torch.min(c), torch.max(c), torch.sum(c)/len(c)))
 
 # For LBFGS Optimizer use n_optim_steps = 1
-n_optim_steps = 1000
+n_optim_steps = 1
 optimize(n_optim_steps)
 
 # Velocity profile
