@@ -58,11 +58,11 @@ def compute_loss(c):
     return jnp.linalg.norm(u2 - target)
 
 # Gradient of forward problem
-df = grad(compute_loss)
+# df = grad(compute_loss)
 
 # Return value and gradient
 def value_grad(c):
-  return compute_loss(c), df(c)
+  return compute_loss(c), grad(compute_loss)(c)
 
 # Optimizers
 def optimizer(params, niter):
@@ -86,15 +86,25 @@ def bfgs_optimizer(params, niter):
   result, state = res
   return result
 
+# Tensor Flow Probability Optimization library
+def tf_optimizer():
+  results = tfp.optimizer.bfgs_minimize(
+        jax.jit(compute_loss), initial_position=params, tolerance=1e-5)
+  return results.position
+
+# Initial model
 # params = jnp.ones(n) * 0.85 # Constant model
 params = jnp.linspace(0.85, 1.0, n) # Linear model
+
+
 # result = bfgs_optimizer(params, 100)
 # result = optimizer(params, 1000)
+result = tf_optimizer()
 
-results = tfp.optimizer.bfgs_minimize(
-        jax.jit(compute_loss), initial_position=params, tolerance=1e-5)
-result = results.position
 
+
+
+# Plotting functions
 # Velocity profile
 plt.plot(result, 'r--', label='velocity profile')
 plt.plot(ctarget, 'c', label='Target velocity profile')
@@ -106,12 +116,3 @@ plt.plot(wave, 'g-.', label='solution')
 plt.plot(target, 'b:', label='target')
 plt.legend()
 plt.savefig("waves.png")
-
-# Newton Raphson
-# c = 0.975
-# for i in range(20):
-#   print("Iteration {} c {}".format(i, c))
-#   h = forward(c)/df(c)
-#   c = c - h
-#   if abs(h) < 1e-5:
-#     break
