@@ -52,6 +52,11 @@ def wave_propagation(params):
 ctarget = jnp.linspace(0.9, 1.0, n) # Linear model
 target = wave_propagation(ctarget)
 
+
+#############################################################
+#  NOTE: Uncomment the line only for TFP optimizer and 
+#        jaxopt value_and_grad = True
+#############################################################
 @jax.value_and_grad
 def compute_loss(c):
     u2 = wave_propagation(c)
@@ -65,7 +70,7 @@ def value_grad(c):
   return compute_loss(c), grad(compute_loss)(c)
 
 # Optimizers
-def optimizer(params, niter):
+def optax_adam(params, niter):
   # Initialize parameters of the model + optimizer.
   start_learning_rate = 1e-3
   optimizer = optax.adam(start_learning_rate)
@@ -79,16 +84,16 @@ def optimizer(params, niter):
   return params
 
 # BFGS Optimizer
-def bfgs_optimizer(params, niter):
-  opt= jaxopt.LBFGS(fun=compute_loss, maxiter=niter)
-  # opt= jaxopt.BFGS(fun=value_grad, value_and_grad=True, tol=1e-2, implicit_diff=False, maxiter=niter)
+# TODO: Implement box constrained optimizer
+def jaxopt_bfgs(params, niter):
+  opt= jaxopt.BFGS(fun=compute_loss, value_and_grad=True, tol=1e-5, implicit_diff=False, maxiter=niter)
   res = opt.run(init_params=params)
-  result, state = res
+  result, _ = res
   return result
 
 # Tensor Flow Probability Optimization library
-def tf_optimizer():
-  results = tfp.optimizer.bfgs_minimize(
+def tfp_lbfgs(params):
+  results = tfp.optimizer.lbfgs_minimize(
         jax.jit(compute_loss), initial_position=params, tolerance=1e-5)
   return results.position
 
@@ -97,11 +102,9 @@ def tf_optimizer():
 params = jnp.linspace(0.85, 1.0, n) # Linear model
 
 
-# result = bfgs_optimizer(params, 100)
-# result = optimizer(params, 1000)
-result = tf_optimizer()
-
-
+# result = jaxopt_bfgs(params, 1000)    # BFGS optimizer
+# result = optax_adam(params, 1000)     # ADAM optimizer
+result = tfp_lbfgs(params)            # LBFGS optimizer
 
 
 # Plotting functions
