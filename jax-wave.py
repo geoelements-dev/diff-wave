@@ -3,6 +3,8 @@ from jax import grad, jit, vmap, lax
 import jax.scipy as jsp
 import jax.scipy.optimize as jsp_opt
 import optax 
+import jaxopt
+from jaxopt import ScipyBoundedMinimize
 import matplotlib.pyplot as plt
 
 
@@ -44,7 +46,8 @@ def wave_propagation(params):
     return u2
 
 # Assign target
-ctarget = jnp.ones(n) * 1.0 # constant model
+# ctarget = jnp.ones(n) * 1.0 # constant model
+ctarget = jnp.linspace(0.9, 1.0, n) # Linear model
 target = wave_propagation(ctarget)
 
 @jit
@@ -55,38 +58,54 @@ def compute_loss(c):
 # Gradient of forward problem
 df = grad(compute_loss)
 
-start_learning_rate = 1e-3
-optimizer = optax.adam(start_learning_rate)
+# Return value and gradient
+def value_grad(c):
+  return compute_loss(c), df(c)
 
-# Initialize parameters of the model + optimizer.
-params = jnp.ones(n) * 0.85 # Constant model
-opt_state = optimizer.init(params)
+# Optimizers
+def optimizer(params, niter):
+  # Initialize parameters of the model + optimizer.
+  start_learning_rate = 1e-3
+  optimizer = optax.adam(start_learning_rate)
+  opt_state = optimizer.init(params)
 
-# A simple update loop.
-for _ in range(1000):
-  grads = grad(compute_loss)(params)
-  updates, opt_state = optimizer.update(grads, opt_state)
-  params = optax.apply_updates(params, updates)
+  # A simple update loop.
+  for _ in range(niter):
+    grads = grad(compute_loss)(params)
+    updates, opt_state = optimizer.update(grads, opt_state)
+    params = optax.apply_updates(params, updates)
+  return params
 
+# BFGS Optimizer
+def bfgs_optimizer(params, niter):
+  # opt= jaxopt.BFGS(fun=compute_loss, maxiter=niter)
+  opt= jaxopt.BFGS(fun=value_grad, value_and_grad=True, maxiter=niter)
+  res = opt.run(init_params=params)
+  result, state = res
+  return result
+
+# params = jnp.ones(n) * 0.85 # Constant model
+params = jnp.linspace(0.85, 1.0, n) # Linear model
+result = bfgs_optimizer(params, 100)
+# result = optimizer(params, 1000)
 
 # Velocity profile
-plt.plot(params, 'r--', label='velocity profile')
+plt.plot(result, 'r--', label='velocity profile')
 plt.plot(ctarget, 'c', label='Target velocity profile')
 
 # Waves
-wave = wave_propagation(params)
+wave = wave_propagation(result)
 
 plt.plot(wave, 'g-.', label='solution')
 plt.plot(target, 'b:', label='target')
 plt.legend()
 plt.savefig("waves.png")
 
-"""
-c = 0.975
-for i in range(20):
-  print("Iteration {} c {}".format(i, c))
-  h = forward(c)/df(c)
-  c = c - h
-  if abs(h) < 1e-5:
-    break
-"""
+# Newton Raphson
+# c = 0.975
+# for i in range(20):
+#   print("Iteration {} c {}".format(i, c))
+#   h = forward(c)/df(c)
+#   c = c - h
+#   if abs(h) < 1e-5:
+#     break
