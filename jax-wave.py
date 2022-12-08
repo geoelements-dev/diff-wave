@@ -1,3 +1,4 @@
+from tensorflow_probability.substrates import jax as tfp
 import jax.numpy as jnp
 from jax import grad, jit, vmap, lax
 import jax.scipy as jsp
@@ -6,6 +7,7 @@ import optax
 import jaxopt
 from jaxopt import ScipyBoundedMinimize
 import matplotlib.pyplot as plt
+import jax
 
 
 # Set up an n-point uniform mesh
@@ -50,7 +52,7 @@ def wave_propagation(params):
 ctarget = jnp.linspace(0.9, 1.0, n) # Linear model
 target = wave_propagation(ctarget)
 
-@jit
+@jax.value_and_grad
 def compute_loss(c):
     u2 = wave_propagation(c)
     return jnp.linalg.norm(u2 - target)
@@ -78,16 +80,20 @@ def optimizer(params, niter):
 
 # BFGS Optimizer
 def bfgs_optimizer(params, niter):
-  # opt= jaxopt.BFGS(fun=compute_loss, maxiter=niter)
-  opt= jaxopt.BFGS(fun=value_grad, value_and_grad=True, maxiter=niter)
+  opt= jaxopt.LBFGS(fun=compute_loss, maxiter=niter)
+  # opt= jaxopt.BFGS(fun=value_grad, value_and_grad=True, tol=1e-2, implicit_diff=False, maxiter=niter)
   res = opt.run(init_params=params)
   result, state = res
   return result
 
 # params = jnp.ones(n) * 0.85 # Constant model
 params = jnp.linspace(0.85, 1.0, n) # Linear model
-result = bfgs_optimizer(params, 100)
+# result = bfgs_optimizer(params, 100)
 # result = optimizer(params, 1000)
+
+results = tfp.optimizer.bfgs_minimize(
+        jax.jit(compute_loss), initial_position=params, tolerance=1e-5)
+result = results.position
 
 # Velocity profile
 plt.plot(result, 'r--', label='velocity profile')
