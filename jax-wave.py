@@ -9,6 +9,8 @@ from jaxopt import ScipyBoundedMinimize
 import matplotlib.pyplot as plt
 import jax
 
+# Recorder location
+recorder = -100
 
 # Set up an n-point uniform mesh
 n = 1000
@@ -28,8 +30,9 @@ def wave_propagation(params):
     u0 = jnp.exp(-(5*(x0-0.5))**2)
     u1 = jnp.exp(-(5*(x0-0.5-c*dt))**2)
     u2 = jnp.zeros(n)
+    ut = jnp.zeros(5000)
     def step(i, carry):
-        u0, u1, u2 = carry
+        u0, u1, u2, ut = carry
         # Shift right to get j - 1 and set the first value to 0
         u1p = jnp.roll(u1, 1)
         u1p = u1p.at[0].set(0)
@@ -41,11 +44,12 @@ def wave_propagation(params):
         u2 = 2 * u1 - u0 + C2*(u1p -2*u1 +u1n)
         u0 = u1
         u1 = u2
-        return (u0, u1, u2)
+        ut = ut.at[i].set(u2[recorder])
+        return (u0, u1, u2, ut)
     # Space for time steps
-    u0, u1, u2 = lax.fori_loop(0, 5000, step, (u0, u1, u2))
+    u0, u1, u2, ut = lax.fori_loop(0, 5000, step, (u0, u1, u2, ut))
 
-    return u2
+    return ut #u2
 
 # Assign target
 # ctarget = jnp.ones(n) * 1.0 # constant model
@@ -109,13 +113,20 @@ result = tfp_lbfgs(params)            # LBFGS optimizer
 
 # Plotting functions
 # Velocity profile
-plt.plot(result, 'r--', label='velocity profile')
-plt.plot(ctarget, 'c', label='Target velocity profile')
+fig1, ax1 = plt.subplots()
+ax1.plot(result, 'r--', label='velocity profile')
+ax1.plot(ctarget, 'c', label='Target velocity profile')
+ax1.set_xlabel('L')
+ax1.set_ylabel('Velocity (c)')
+fig1.legend()
+fig1.savefig("velocity.png")
 
 # Waves
 wave = wave_propagation(result)
-
-plt.plot(wave, 'g-.', label='solution')
-plt.plot(target, 'b:', label='target')
-plt.legend()
-plt.savefig("waves.png")
+fig2, ax2 = plt.subplots()
+ax2.plot(wave, 'g-.', label='solution')
+ax2.plot(target, 'b:', label='target')
+ax2.set_xlabel('time')
+ax2.set_ylabel('amplitude')
+fig2.legend()
+fig2.savefig("waves.png")
